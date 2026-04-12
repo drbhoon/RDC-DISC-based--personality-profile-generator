@@ -4,7 +4,6 @@ const path     = require('path');
 const XLSX     = require('xlsx');
 const pool     = require('../db');
 const { requireAdmin } = require('../auth');
-const { generateReportPDF } = require('../pdfExport');
 const { generateAndStoreReport } = require('../aiReport');
 
 const router = express.Router();
@@ -111,23 +110,9 @@ router.get('/assessments/:id/report', async (req, res) => {
 });
 
 // ── GET /api/admin/assessments/:id/pdf ───────────────────────────────────
-// Server-side Puppeteer PDF generation
-router.get('/assessments/:id/pdf', async (req, res) => {
-  const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3001}`;
-  const reportUrl = `${appUrl}/admin/report/${req.params.id}`;
-
-  // Extract the raw JWT from the Authorization header
-  const authToken = req.headers['authorization']?.slice(7) || '';
-
-  try {
-    const pdfBuffer = await generateReportPDF(reportUrl, authToken);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="rdc-disc-report-${req.params.id}.pdf"`);
-    return res.send(pdfBuffer);
-  } catch (err) {
-    console.error('[admin/pdf GET]', err);
-    return res.status(500).json({ error: 'PDF generation failed' });
-  }
+// PDF is generated client-side via window.print() — this route is unused.
+router.get('/assessments/:id/pdf', (req, res) => {
+  return res.status(410).json({ error: 'Server-side PDF is disabled. Use the browser Print → Save as PDF option.' });
 });
 
 // ── POST /api/admin/assessments/:id/regenerate ───────────────────────────

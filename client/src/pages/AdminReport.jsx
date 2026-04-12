@@ -66,31 +66,8 @@ export default function AdminReport() {
       .catch((err) => setError(err.response?.data?.error || 'Failed to load report'));
   }, [id]);
 
-  async function handlePDF() {
-    const token = localStorage.getItem('rdc_admin_token');
-    if (!token) { alert('Not logged in.'); return; }
-    try {
-      const res = await fetch(`/api/admin/assessments/${id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        alert(body.error || 'PDF generation failed.');
-        return;
-      }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `rdc-disc-report-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('[PDF]', err);
-      alert('PDF generation failed. Please try again.');
-    }
+  function handlePDF() {
+    window.print();
   }
 
   async function handleRegenerate() {
@@ -105,6 +82,18 @@ export default function AdminReport() {
 
   if (error) return <div style={S.error}>{error}</div>;
   if (!data)  return <div style={S.loading}>Loading report…</div>;
+
+  const printCSS = `
+    @media print {
+      @page { size: A4; margin: 15mm 15mm 15mm 15mm; }
+      body  { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      .print-header { display: block !important; }
+      /* avoid page breaks inside cards */
+      section, .card { page-break-inside: avoid; break-inside: avoid; }
+    }
+    @media screen { .print-header { display: none; } }
+  `;
 
   const { assessment, scores, ai_report } = data;
   const report = ai_report?.report_json || {};
@@ -133,7 +122,15 @@ export default function AdminReport() {
 
   return (
     <div style={S.page} data-pdf-ready>
-      <header style={S.header}>
+      <style>{printCSS}</style>
+
+      {/* Print-only top bar */}
+      <div className="print-header" style={{ padding: '0 0 12px', borderBottom: '2px solid #1F3864', marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>RDC People Science Platform</div>
+        <div style={{ fontSize: 19, fontWeight: 800, color: '#1F3864' }}>Behavioral Assessment Report</div>
+      </div>
+
+      <header style={S.header} className="no-print">
         <button style={S.backBtn} onClick={() => navigate('/admin')}>← Back</button>
         <p style={S.hTitle}>Assessment Report</p>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -314,8 +311,8 @@ export default function AdminReport() {
           </>
         )}
 
-        {/* Bottom PDF button */}
-        <div style={{ textAlign: 'right', marginTop: 8 }}>
+        {/* Bottom PDF button — hidden in print */}
+        <div className="no-print" style={{ textAlign: 'right', marginTop: 8 }}>
           <button style={{ ...S.pdfBtn, padding: '10px 24px', fontSize: 14 }} onClick={handlePDF}>
             Download PDF
           </button>

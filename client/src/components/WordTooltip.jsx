@@ -1,41 +1,62 @@
 import { useState } from 'react';
 
-const S = {
-  wrap:    { display: 'inline-flex', alignItems: 'center', gap: 6 },
-  word:    { fontSize: 14, color: '#222', fontWeight: 500 },
-  icon:    { display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-             width: 18, height: 18, borderRadius: '50%', background: '#e0e8f5',
-             color: '#2E5496', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-             flexShrink: 0, userSelect: 'none', border: 'none', padding: 0 },
-  tooltip: { position: 'absolute', zIndex: 100, background: '#1F3864', color: '#fff',
-             padding: '8px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.5,
-             maxWidth: 280, boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-             pointerEvents: 'none', whiteSpace: 'normal', bottom: '100%',
-             left: 0, marginBottom: 6 },
-  container: { position: 'relative', display: 'inline-flex', alignItems: 'center' },
+const iconStyle = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 18, height: 18, borderRadius: '50%', background: '#e0e8f5',
+  color: '#2E5496', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+  flexShrink: 0, userSelect: 'none', border: 'none', padding: 0,
 };
 
 export default function WordTooltip({ word, definition }) {
-  const [visible, setVisible] = useState(false);
+  const [pos, setPos] = useState(null); // {x, y} in viewport coords
+
+  function showAt(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({ x: rect.left + rect.width / 2, y: rect.top - 8 });
+  }
+
+  function hide() { setPos(null); }
+
+  // Compute left so tooltip stays within viewport
+  function tooltipStyle() {
+    const W = 300;
+    let left = (pos?.x ?? 0) - W / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - W - 8));
+    return {
+      position: 'fixed',
+      zIndex: 9999,
+      background: '#1F3864',
+      color: '#fff',
+      padding: '10px 14px',
+      borderRadius: 8,
+      fontSize: 13,
+      lineHeight: 1.65,
+      width: W,
+      boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
+      pointerEvents: 'none',
+      whiteSpace: 'normal',
+      top: (pos?.y ?? 0) - 0,
+      left,
+      transform: 'translateY(-100%)',
+    };
+  }
 
   return (
-    <span style={S.wrap}>
-      <span style={S.word}>{word}</span>
-      <span style={S.container}>
-        <button
-          style={S.icon}
-          onMouseEnter={() => setVisible(true)}
-          onMouseLeave={() => setVisible(false)}
-          onTouchStart={(e) => { e.stopPropagation(); setVisible((v) => !v); }}
-          aria-label={`Definition of ${word}`}
-          type="button"
-        >
-          i
-        </button>
-        {visible && definition && (
-          <span style={S.tooltip}>{definition}</span>
-        )}
-      </span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 15, color: '#222' }}>{word}</span>
+      <button
+        style={iconStyle}
+        onMouseEnter={showAt}
+        onMouseLeave={hide}
+        onTouchStart={(e) => { e.stopPropagation(); pos ? hide() : showAt(e); }}
+        aria-label={`Definition of ${word}`}
+        type="button"
+      >
+        i
+      </button>
+      {pos && definition && (
+        <span style={tooltipStyle()}>{definition}</span>
+      )}
     </span>
   );
 }

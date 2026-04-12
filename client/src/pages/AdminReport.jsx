@@ -66,10 +66,31 @@ export default function AdminReport() {
       .catch((err) => setError(err.response?.data?.error || 'Failed to load report'));
   }, [id]);
 
-  function handlePDF() {
+  async function handlePDF() {
     const token = localStorage.getItem('rdc_admin_token');
-    // Attach token as query param so Puppeteer can pick it up via localStorage injection
-    window.open(`/api/admin/assessments/${id}/pdf`, '_blank');
+    if (!token) { alert('Not logged in.'); return; }
+    try {
+      const res = await fetch(`/api/admin/assessments/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || 'PDF generation failed.');
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `rdc-disc-report-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[PDF]', err);
+      alert('PDF generation failed. Please try again.');
+    }
   }
 
   async function handleRegenerate() {

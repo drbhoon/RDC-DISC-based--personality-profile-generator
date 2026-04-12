@@ -103,16 +103,19 @@ export default function CandidateAssess() {
     <div style={{ minHeight: '100vh', background: '#f0f3f8', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
 
       {/* ── Top Header ─────────────────────────────────────────────────────── */}
-      <div style={{ background: '#1a2e4a', padding: '0 24px' }}>
-        <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+      <div style={{ background: '#1a2e4a' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 72 }}>
           <div>
-            <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: 0.3 }}>
+            <div style={{ color: '#fff', fontWeight: 900, fontSize: 22, letterSpacing: 0.4, lineHeight: 1 }}>
               RDC People Science Profiler
-            </span>
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, marginTop: 4, fontWeight: 500, letterSpacing: 0.3 }}>
+              DISC Behavioral Assessment · 24 Questions
+            </div>
           </div>
           <button
             onClick={() => setHindi((h) => !h)}
-            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 7, padding: '7px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}
           >
             {hindi ? 'English' : 'हिंदी'}
           </button>
@@ -120,32 +123,68 @@ export default function CandidateAssess() {
       </div>
 
       {/* ── Welcome + Instructions ──────────────────────────────────────────── */}
-      <div style={{ maxWidth: 820, margin: '28px auto 0', padding: '0 20px' }}>
-        <p style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: '#1a2e4a' }}>
-          Welcome, <span style={{ color: '#2563a8' }}>{meta.candidate_name}</span>!
-        </p>
-        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#555', lineHeight: 1.6 }}>
-          <strong>Instructions:</strong> For each of 24 rows, pick the word <strong>MOST</strong> like you and <strong>LEAST</strong> like you at work. Answer instinctively — your first reaction is best.
-        </p>
+      <div style={{ maxWidth: 860, margin: '28px auto 0', padding: '0 28px' }}>
+
+        {/* Name + Role */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 900, color: '#1a2e4a', lineHeight: 1.2 }}>
+            Welcome, <span style={{ color: '#2563a8' }}>{meta.candidate_name}</span>.
+          </p>
+          <p style={{ margin: 0, fontSize: 14, color: '#666', fontWeight: 500 }}>
+            Your Profile:{' '}
+            <span style={{
+              display: 'inline-block',
+              background: '#e8f0fb', color: '#1a2e4a',
+              border: '1px solid #c3d4ef',
+              borderRadius: 20, padding: '2px 12px',
+              fontSize: 13, fontWeight: 700,
+            }}>
+              {meta.role_assessed}
+            </span>
+          </p>
+        </div>
+
+        {/* Instructions box */}
+        <div style={{
+          background: '#1a2e4a', color: '#fff',
+          borderRadius: 10, padding: '16px 22px',
+          marginBottom: 22,
+          display: 'flex', alignItems: 'flex-start', gap: 14,
+        }}>
+          <div style={{
+            background: '#c87a2a', color: '#fff',
+            borderRadius: 6, padding: '3px 10px',
+            fontSize: 11, fontWeight: 800, letterSpacing: 0.5,
+            textTransform: 'uppercase', whiteSpace: 'nowrap', marginTop: 2,
+            flexShrink: 0,
+          }}>
+            Instructions
+          </div>
+          <p style={{ margin: 0, fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: '#fff' }}>
+            For each of 24 rows, pick the word <strong style={{ color: '#f0c070' }}>MOST</strong> like you and{' '}
+            <strong style={{ color: '#f0c070' }}>LEAST</strong> like you at work.
+            Answer instinctively — your first reaction is best.
+          </p>
+        </div>
 
         {/* Progress bar */}
-        <div style={{ background: '#dce5f0', borderRadius: 4, height: 7, marginBottom: 6 }}>
+        <div style={{ background: '#dce5f0', borderRadius: 4, height: 8, marginBottom: 6 }}>
           <div style={{ height: '100%', borderRadius: 4, background: '#2563a8', width: `${progressPct}%`, transition: 'width .3s' }} />
         </div>
-        <p style={{ margin: 0, fontSize: 12, color: '#888' }}>
+        <p style={{ margin: 0, fontSize: 12, color: '#888', fontWeight: 500 }}>
           {answeredCount} of 24 rows completed · Page {page + 1} of {TOTAL_PAGES}
         </p>
       </div>
 
       {/* ── Row Range Label ─────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 820, margin: '18px auto 10px', padding: '0 20px' }}>
-        <span style={{ fontSize: 12, color: '#777', fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+      <div style={{ maxWidth: 860, margin: '18px auto 10px', padding: '0 28px' }}>
+        <span style={{ fontSize: 12, color: '#777', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase' }}>
           Rows {pageStart + 1}–{pageStart + ROWS_PER_PAGE} of 24
         </span>
       </div>
 
       {/* ── Question Cards ──────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 20px 40px' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 28px 48px' }}>
         {pageQs.map((q, ri) => {
           const sel        = selections[q.index];
           const rowDone    = sel.most !== null && sel.least !== null;

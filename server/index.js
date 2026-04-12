@@ -21,6 +21,9 @@ app.use('/api/auth',   authRoutes);
 app.use('/api/admin',  adminRoutes);
 app.use('/api/assess', assessRoutes);
 
+// ── Health check ───────────────────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
 // ── Serve React build in production ───────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
@@ -30,9 +33,6 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
-
-// ── Health check ───────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── Start ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;

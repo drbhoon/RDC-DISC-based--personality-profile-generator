@@ -7,7 +7,7 @@
 
 // ── HJA Benchmarks (Section 7.1) ──────────────────────────────────────────
 const BENCHMARKS = {
-  'Sales Executive': {
+  'Sales': {
     D: { min: 55, max: 75 },
     I: { min: 70, max: 90 },
     S: { min: 40, max: 65 },
@@ -37,7 +37,7 @@ function isInRange(score, range) {
 function getCriticalFlags(g1, g2, role) {
   const flags = [];
 
-  if (role === 'Sales Executive') {
+  if (role === 'Sales') {
     if (g1.I < 55) {
       flags.push('I < 55: Critical deficit — Influence very low for Sales. Relationship warmth is non-negotiable in RMC sales.');
     }

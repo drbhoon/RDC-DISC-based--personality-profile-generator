@@ -4,7 +4,7 @@
  */
 
 export const BENCHMARKS = {
-  'Sales Executive': {
+  'Sales': {
     D: { min: 55, max: 75 },
     I: { min: 70, max: 90 },
     S: { min: 40, max: 65 },

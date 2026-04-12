@@ -373,10 +373,11 @@ export const QUESTIONS = [
 ];
 
 export const ROLE_OPTIONS = [
-  'Sales Executive',
+  'Sales',
   'Business Head',
   'Technical / QC',
   'Operations / Plant Incharge',
   'Accounts / Finance',
   'Human Resources',
+  'Others',
 ];

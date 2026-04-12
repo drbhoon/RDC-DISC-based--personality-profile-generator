@@ -1,0 +1,31 @@
+{
+  "name": "rdc-people-science",
+  "version": "1.0.0",
+  "description": "RDC Concrete People Science Platform — DISC-based behavioral profiling",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "concurrently \"nodemon server/index.js\" \"npm run client\"",
+    "client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "postinstall": "npm --prefix client install"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "puppeteer": "^22.8.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

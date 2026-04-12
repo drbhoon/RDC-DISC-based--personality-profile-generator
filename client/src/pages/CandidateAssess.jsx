@@ -8,46 +8,14 @@ import WordTooltip from '../components/WordTooltip.jsx';
 const ROWS_PER_PAGE = 8;
 const TOTAL_PAGES   = 3; // 3 × 8 = 24
 
-const S = {
-  page:     { minHeight: '100vh', background: '#f5f8fc' },
-  header:   { background: '#1F3864', color: '#fff', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  hTitle:   { margin: 0, fontSize: 16, fontWeight: 700 },
-  langBtn:  { background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 13 },
-  welcome:  { maxWidth: 780, margin: '28px auto 0', padding: '0 20px', fontSize: 15, color: '#333' },
-  name:     { fontWeight: 700, color: '#1F3864' },
-  progress: { maxWidth: 780, margin: '16px auto', padding: '0 20px' },
-  bar:      { height: 6, borderRadius: 3, background: '#dce3ee' },
-  fill:     { height: '100%', borderRadius: 3, background: '#2E5496', transition: 'width .3s' },
-  pLabel:   { fontSize: 12, color: '#888', marginTop: 4 },
-  main:     { maxWidth: 780, margin: '0 auto', padding: '16px 20px 40px' },
-  table:    { width: '100%', borderCollapse: 'collapse' },
-  thead:    { background: '#1F3864' },
-  thWord:   { padding: '12px 14px', color: '#fff', fontSize: 12, fontWeight: 700, textAlign: 'left', width: '50%' },
-  thRadio:  { padding: '12px 14px', color: '#fff', fontSize: 12, fontWeight: 700, textAlign: 'center', width: '25%' },
-  row:      { borderBottom: '1px solid #e8ecf4' },
-  rowAlt:   { borderBottom: '1px solid #e8ecf4', background: '#f9fbfd' },
-  tdWord:   { padding: '12px 14px', fontSize: 14, color: '#222' },
-  tdRadio:  { padding: '12px', textAlign: 'center' },
-  radio:    { width: 18, height: 18, cursor: 'pointer', accentColor: '#2E5496' },
-  nav:      { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 },
-  btnPrev:  { background: '#fff', color: '#1F3864', border: '1.5px solid #1F3864', borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
-  btnNext:  { background: '#1F3864', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
-  btnDis:   { opacity: 0.45, cursor: 'not-allowed' },
-  pageInfo: { fontSize: 13, color: '#888' },
-  error:    { textAlign: 'center', padding: 60, color: '#c0392b', fontSize: 16 },
-  loading:  { textAlign: 'center', padding: 60, color: '#888' },
-  colLabel: { display: 'flex', justifyContent: 'space-around', padding: '8px 14px 0', fontSize: 12, fontWeight: 700, color: '#2E5496' },
-};
-
 export default function CandidateAssess() {
   const { token }    = useParams();
   const navigate     = useNavigate();
-  const [meta, setMeta]         = useState(null);   // { candidate_name, role_assessed }
+  const [meta, setMeta]         = useState(null);
   const [error, setError]       = useState('');
   const [hindi, setHindi]       = useState(false);
-  const [page, setPage]         = useState(0);      // 0, 1, 2
+  const [page, setPage]         = useState(0);
   const [selections, setSelections] = useState(
-    // {0: {most: 'D', least: 'I'}, ...}
     Object.fromEntries(Array.from({ length: 24 }, (_, i) => [i, { most: null, least: null }]))
   );
   const [submitting, setSubmitting] = useState(false);
@@ -56,18 +24,16 @@ export default function CandidateAssess() {
     api.get(`/assess/${token}`)
       .then((res) => setMeta(res.data))
       .catch((err) => {
-        const msg = err.response?.data?.error || 'Assessment not found.';
         if (err.response?.status === 410) {
           setError('This assessment has already been submitted.');
         } else {
-          setError(msg);
+          setError(err.response?.data?.error || 'Assessment not found.');
         }
       });
   }, [token]);
 
   function getDefinition(word) {
     if (hindi) return HINDI_DEFINITIONS[word] || '';
-    // find from questions
     for (const q of QUESTIONS) {
       const w = q.words.find((w) => w.word === word);
       if (w) return w.definition;
@@ -79,42 +45,32 @@ export default function CandidateAssess() {
     setSelections((prev) => {
       const cur = { ...prev[qIndex] };
       cur[type] = dim;
-      // If most and least are same, clear the other
       if (type === 'most'  && cur.least === dim) cur.least = null;
       if (type === 'least' && cur.most  === dim) cur.most  = null;
       return { ...prev, [qIndex]: cur };
     });
   }
 
-  // Questions for current page
-  const pageStart = page * ROWS_PER_PAGE;
-  const pageQs    = QUESTIONS.slice(pageStart, pageStart + ROWS_PER_PAGE);
-
-  // Check if current page is complete
+  const pageStart  = page * ROWS_PER_PAGE;
+  const pageQs     = QUESTIONS.slice(pageStart, pageStart + ROWS_PER_PAGE);
   const pageComplete = pageQs.every((q) => {
     const s = selections[q.index];
     return s.most !== null && s.least !== null;
   });
-
-  // Total answered rows
   const answeredCount = QUESTIONS.filter((q) => {
     const s = selections[q.index];
     return s.most !== null && s.least !== null;
   }).length;
-
   const allComplete = answeredCount === 24;
 
   async function handleSubmit() {
     setSubmitting(true);
     const responses = QUESTIONS.map((q) => {
       const s = selections[q.index];
-      // find dim for the selected word
-      const mostWord  = q.words.find((w) => w.dim === s.most);
-      const leastWord = q.words.find((w) => w.dim === s.least);
       return {
         question_index: q.index,
-        most_dim:  mostWord?.dim  || s.most,
-        least_dim: leastWord?.dim || s.least,
+        most_dim:  s.most,
+        least_dim: s.least,
       };
     });
     try {
@@ -126,106 +82,219 @@ export default function CandidateAssess() {
     }
   }
 
-  if (error) return <div style={S.error}>{error}</div>;
-  if (!meta)  return <div style={S.loading}>Loading…</div>;
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f8fc' }}>
+        <div style={{ textAlign: 'center', padding: 40, color: '#c0392b', fontSize: 16 }}>{error}</div>
+      </div>
+    );
+  }
+  if (!meta) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f8fc' }}>
+        <div style={{ color: '#888', fontSize: 15 }}>Loading…</div>
+      </div>
+    );
+  }
+
+  const progressPct = Math.round((answeredCount / 24) * 100);
 
   return (
-    <div style={S.page}>
-      <header style={S.header}>
-        <p style={S.hTitle}>RDC Behavioral Assessment</p>
-        <button style={S.langBtn} onClick={() => setHindi((h) => !h)}>
-          {hindi ? 'English' : 'हिंदी'}
-        </button>
-      </header>
+    <div style={{ minHeight: '100vh', background: '#f0f3f8', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
 
-      <div style={S.welcome}>
-        Welcome, <span style={S.name}>{meta.candidate_name}</span>. Please complete your behavioral assessment below.
-      </div>
-
-      {/* Progress bar */}
-      <div style={S.progress}>
-        <div style={S.bar}>
-          <div style={{ ...S.fill, width: `${(answeredCount / 24) * 100}%` }} />
+      {/* ── Top Header ─────────────────────────────────────────────────────── */}
+      <div style={{ background: '#1a2e4a', padding: '0 24px' }}>
+        <div style={{ maxWidth: 820, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+          <div>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: 0.3 }}>
+              RDC People Science Profiler
+            </span>
+          </div>
+          <button
+            onClick={() => setHindi((h) => !h)}
+            style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+          >
+            {hindi ? 'English' : 'हिंदी'}
+          </button>
         </div>
-        <p style={S.pLabel}>{answeredCount} of 24 rows completed</p>
       </div>
 
-      <main style={S.main}>
-        <table style={S.table}>
-          <thead style={S.thead}>
-            <tr>
-              <th style={S.thWord}>Word</th>
-              <th style={S.thRadio}>Most</th>
-              <th style={S.thRadio}>Least</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageQs.map((q, ri) => (
-              q.words.map((w, wi) => {
-                const sel  = selections[q.index];
-                const isOdd = ri % 2 !== 0;
+      {/* ── Welcome + Instructions ──────────────────────────────────────────── */}
+      <div style={{ maxWidth: 820, margin: '28px auto 0', padding: '0 20px' }}>
+        <p style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: '#1a2e4a' }}>
+          Welcome, <span style={{ color: '#2563a8' }}>{meta.candidate_name}</span>!
+        </p>
+        <p style={{ margin: '0 0 16px', fontSize: 14, color: '#555', lineHeight: 1.6 }}>
+          <strong>Instructions:</strong> For each of 24 rows, pick the word <strong>MOST</strong> like you and <strong>LEAST</strong> like you at work. Answer instinctively — your first reaction is best.
+        </p>
+
+        {/* Progress bar */}
+        <div style={{ background: '#dce5f0', borderRadius: 4, height: 7, marginBottom: 6 }}>
+          <div style={{ height: '100%', borderRadius: 4, background: '#2563a8', width: `${progressPct}%`, transition: 'width .3s' }} />
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: '#888' }}>
+          {answeredCount} of 24 rows completed · Page {page + 1} of {TOTAL_PAGES}
+        </p>
+      </div>
+
+      {/* ── Row Range Label ─────────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 820, margin: '18px auto 10px', padding: '0 20px' }}>
+        <span style={{ fontSize: 12, color: '#777', fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase' }}>
+          Rows {pageStart + 1}–{pageStart + ROWS_PER_PAGE} of 24
+        </span>
+      </div>
+
+      {/* ── Question Cards ──────────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 20px 40px' }}>
+        {pageQs.map((q, ri) => {
+          const sel        = selections[q.index];
+          const rowDone    = sel.most !== null && sel.least !== null;
+          const globalRow  = pageStart + ri + 1;
+
+          return (
+            <div
+              key={q.index}
+              style={{
+                background: '#fff',
+                borderRadius: 10,
+                marginBottom: 14,
+                boxShadow: rowDone
+                  ? '0 1px 4px rgba(37,99,168,0.15)'
+                  : '0 1px 3px rgba(0,0,0,0.07)',
+                border: rowDone ? '1.5px solid #c3d9f5' : '1.5px solid #e8edf4',
+                overflow: 'hidden',
+                transition: 'border-color .2s, box-shadow .2s',
+              }}
+            >
+              {/* Card header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#f8fafd', borderBottom: '1px solid #e8edf4' }}>
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#1a2e4a', letterSpacing: 0.2 }}>
+                  ROW {globalRow}
+                  {rowDone && <span style={{ marginLeft: 8, color: '#27ae60', fontSize: 12 }}>✓</span>}
+                </span>
+                <span style={{ fontSize: 11, color: '#999', fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Pick MOST &amp; LEAST
+                </span>
+              </div>
+
+              {/* Sub-header */}
+              <div style={{ display: 'flex', alignItems: 'center', padding: '6px 16px', borderBottom: '1px solid #f0f3f8' }}>
+                <span style={{ flex: 1, fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Word</span>
+                <span style={{ width: 72, textAlign: 'center', fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Most</span>
+                <span style={{ width: 72, textAlign: 'center', fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Least</span>
+              </div>
+
+              {/* Word rows */}
+              {q.words.map((w, wi) => {
+                const isMost  = sel.most  === w.dim;
+                const isLeast = sel.least === w.dim;
+                const highlight = isMost || isLeast;
                 return (
-                  <tr key={`${q.index}-${wi}`} style={isOdd ? S.rowAlt : S.row}>
-                    <td style={S.tdWord}>
+                  <div
+                    key={wi}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '11px 16px',
+                      borderBottom: wi < q.words.length - 1 ? '1px solid #f0f3f8' : 'none',
+                      background: highlight ? '#f0f6ff' : 'transparent',
+                      transition: 'background .15s',
+                    }}
+                  >
+                    <div style={{ flex: 1, fontSize: 15, fontWeight: highlight ? 600 : 400, color: '#222' }}>
                       <WordTooltip word={w.word} definition={getDefinition(w.word)} />
-                    </td>
-                    <td style={S.tdRadio}>
+                    </div>
+
+                    {/* Most radio */}
+                    <div style={{ width: 72, display: 'flex', justifyContent: 'center' }}>
                       <input
                         type="radio"
-                        style={S.radio}
                         name={`most-${q.index}`}
-                        checked={sel.most === w.dim}
+                        checked={isMost}
                         onChange={() => handleSelect(q.index, 'most', w.dim)}
                         disabled={sel.least === w.dim}
+                        style={{ width: 20, height: 20, cursor: sel.least === w.dim ? 'not-allowed' : 'pointer', accentColor: '#2563a8' }}
                       />
-                    </td>
-                    <td style={S.tdRadio}>
+                    </div>
+
+                    {/* Least radio */}
+                    <div style={{ width: 72, display: 'flex', justifyContent: 'center' }}>
                       <input
                         type="radio"
-                        style={S.radio}
                         name={`least-${q.index}`}
-                        checked={sel.least === w.dim}
+                        checked={isLeast}
                         onChange={() => handleSelect(q.index, 'least', w.dim)}
                         disabled={sel.most === w.dim}
+                        style={{ width: 20, height: 20, cursor: sel.most === w.dim ? 'not-allowed' : 'pointer', accentColor: '#2563a8' }}
                       />
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
-              })
-            ))}
-          </tbody>
-        </table>
+              })}
+            </div>
+          );
+        })}
 
-        <div style={S.nav}>
+        {/* ── Navigation ───────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
           <button
-            style={{ ...S.btnPrev, ...(page === 0 ? S.btnDis : {}) }}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => { setPage((p) => p - 1); window.scrollTo(0, 0); }}
             disabled={page === 0}
+            style={{
+              background: '#fff',
+              color: page === 0 ? '#bbb' : '#1a2e4a',
+              border: `1.5px solid ${page === 0 ? '#ddd' : '#1a2e4a'}`,
+              borderRadius: 8,
+              padding: '10px 28px',
+              cursor: page === 0 ? 'not-allowed' : 'pointer',
+              fontWeight: 700,
+              fontSize: 14,
+            }}
           >
             ← Previous
           </button>
 
-          <span style={S.pageInfo}>Page {page + 1} of {TOTAL_PAGES}</span>
+          <span style={{ fontSize: 13, color: '#888', fontWeight: 600 }}>
+            Page {page + 1} / {TOTAL_PAGES}
+          </span>
 
           {page < TOTAL_PAGES - 1 ? (
             <button
-              style={{ ...S.btnNext, ...(!pageComplete ? S.btnDis : {}) }}
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => { setPage((p) => p + 1); window.scrollTo(0, 0); }}
               disabled={!pageComplete}
+              style={{
+                background: pageComplete ? '#1a2e4a' : '#b0bbc8',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 28px',
+                cursor: pageComplete ? 'pointer' : 'not-allowed',
+                fontWeight: 700,
+                fontSize: 14,
+              }}
             >
               Next →
             </button>
           ) : (
             <button
-              style={{ ...S.btnNext, background: '#27ae60', ...(!allComplete || submitting ? S.btnDis : {}) }}
               onClick={handleSubmit}
               disabled={!allComplete || submitting}
+              style={{
+                background: allComplete && !submitting ? '#1a7a42' : '#b0bbc8',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 28px',
+                cursor: allComplete && !submitting ? 'pointer' : 'not-allowed',
+                fontWeight: 700,
+                fontSize: 14,
+              }}
             >
               {submitting ? 'Submitting…' : 'Submit Assessment'}
             </button>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

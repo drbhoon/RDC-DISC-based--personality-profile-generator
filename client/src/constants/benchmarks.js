@@ -4,6 +4,14 @@
  */
 
 export const BENCHMARKS = {
+  // Legacy alias for records created before the rename
+  'Sales Executive': {
+    D: { min: 55, max: 75 },
+    I: { min: 70, max: 90 },
+    S: { min: 40, max: 65 },
+    C: { min: 35, max: 60 },
+    pattern: 'I/D',
+  },
   'Sales': {
     D: { min: 55, max: 75 },
     I: { min: 70, max: 90 },

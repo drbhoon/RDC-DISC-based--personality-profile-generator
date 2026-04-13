@@ -35,6 +35,12 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+// Normalise legacy role names stored in DB before the rename
+function normaliseRole(role) {
+  if (role === 'Sales Executive') return 'Sales';
+  return role;
+}
+
 /* ── Section heading band ───────────────────────────────────────────────── */
 function SectionHead({ n, title }) {
   return (
@@ -134,7 +140,7 @@ export default function AdminReport() {
 
   const { assessment, scores, ai_report } = data;
   const report  = ai_report?.report_json || {};
-  const role    = assessment.role_assessed;
+  const role    = normaliseRole(assessment.role_assessed);
   const bench   = BENCHMARKS[role];
   const hasPendingAI = !ai_report || ai_report.status === 'failed';
 

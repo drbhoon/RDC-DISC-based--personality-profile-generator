@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client.js';
-import { QUESTIONS } from '../constants/questions.js';
-import { HINDI_DEFINITIONS } from '../constants/questionsHi.js';
-import WordTooltip from '../components/WordTooltip.jsx';
+import { QUESTIONS_V2 } from '../constants/questions_v2.js';
+
+// Wrap into indexed rows so the rest of the component logic is unchanged
+const QUESTIONS = QUESTIONS_V2.map((words, index) => ({ index, words }));
 
 const ROWS_PER_PAGE = 8;
 const TOTAL_PAGES   = 3; // 3 × 8 = 24
@@ -32,15 +33,6 @@ export default function CandidateAssess() {
       });
   }, [token]);
 
-  function getDefinition(word) {
-    if (hindi) return HINDI_DEFINITIONS[word] || '';
-    for (const q of QUESTIONS) {
-      const w = q.words.find((w) => w.word === word);
-      if (w) return w.definition;
-    }
-    return '';
-  }
-
   function handleSelect(qIndex, type, dim) {
     setSelections((prev) => {
       const cur = { ...prev[qIndex] };
@@ -51,8 +43,8 @@ export default function CandidateAssess() {
     });
   }
 
-  const pageStart  = page * ROWS_PER_PAGE;
-  const pageQs     = QUESTIONS.slice(pageStart, pageStart + ROWS_PER_PAGE);
+  const pageStart   = page * ROWS_PER_PAGE;
+  const pageQs      = QUESTIONS.slice(pageStart, pageStart + ROWS_PER_PAGE);
   const pageComplete = pageQs.every((q) => {
     const s = selections[q.index];
     return s.most !== null && s.least !== null;
@@ -161,7 +153,8 @@ export default function CandidateAssess() {
             Instructions
           </div>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: '#fff' }}>
-            For each of 24 rows, pick the word <strong style={{ color: '#f0c070' }}>MOST</strong> like you and{' '}
+            For each of 24 rows, read all four descriptions and pick the one{' '}
+            <strong style={{ color: '#f0c070' }}>MOST</strong> like you and the one{' '}
             <strong style={{ color: '#f0c070' }}>LEAST</strong> like you at work.
             Answer instinctively — your first reaction is best.
           </p>
@@ -186,9 +179,9 @@ export default function CandidateAssess() {
       {/* ── Question Cards ──────────────────────────────────────────────────── */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 28px 48px' }}>
         {pageQs.map((q, ri) => {
-          const sel        = selections[q.index];
-          const rowDone    = sel.most !== null && sel.least !== null;
-          const globalRow  = pageStart + ri + 1;
+          const sel       = selections[q.index];
+          const rowDone   = sel.most !== null && sel.least !== null;
+          const globalRow = pageStart + ri + 1;
 
           return (
             <div
@@ -216,36 +209,56 @@ export default function CandidateAssess() {
                 </span>
               </div>
 
-              {/* Sub-header */}
+              {/* Column sub-header */}
               <div style={{ display: 'flex', alignItems: 'center', padding: '6px 16px', borderBottom: '1px solid #f0f3f8' }}>
-                <span style={{ flex: 1, fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Word</span>
+                <span style={{ flex: 1, fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Description</span>
                 <span style={{ width: 72, textAlign: 'center', fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Most</span>
                 <span style={{ width: 72, textAlign: 'center', fontSize: 11, color: '#aaa', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Least</span>
               </div>
 
-              {/* Word rows */}
+              {/* Option rows */}
               {q.words.map((w, wi) => {
-                const isMost  = sel.most  === w.dim;
-                const isLeast = sel.least === w.dim;
+                const isMost    = sel.most  === w.dim;
+                const isLeast   = sel.least === w.dim;
                 const highlight = isMost || isLeast;
+                // Hindi toggle: show hi when ON, qualifier when OFF
+                const subText   = hindi ? w.hi : w.qualifier;
+
                 return (
                   <div
                     key={wi}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      padding: '11px 16px',
+                      padding: '12px 16px',
                       borderBottom: wi < q.words.length - 1 ? '1px solid #f0f3f8' : 'none',
                       background: highlight ? '#f0f6ff' : 'transparent',
                       transition: 'background .15s',
                     }}
                   >
-                    <div style={{ flex: 1, fontSize: 15, fontWeight: highlight ? 600 : 400, color: '#222' }}>
-                      <WordTooltip word={w.word} definition={getDefinition(w.word)} />
+                    {/* Two-part label: word + qualifier */}
+                    <div style={{ flex: 1, paddingRight: 12 }}>
+                      <div style={{
+                        fontSize: 15,
+                        fontWeight: highlight ? 600 : 400,
+                        color: '#1a2e4a',
+                        lineHeight: 1.3,
+                      }}>
+                        {w.word}
+                      </div>
+                      <div style={{
+                        fontSize: 12,
+                        fontStyle: 'italic',
+                        color: '#888',
+                        marginTop: 3,
+                        lineHeight: 1.45,
+                      }}>
+                        {subText}
+                      </div>
                     </div>
 
                     {/* Most radio */}
-                    <div style={{ width: 72, display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ width: 72, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                       <input
                         type="radio"
                         name={`most-${q.index}`}
@@ -257,7 +270,7 @@ export default function CandidateAssess() {
                     </div>
 
                     {/* Least radio */}
-                    <div style={{ width: 72, display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ width: 72, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                       <input
                         type="radio"
                         name={`least-${q.index}`}

@@ -179,7 +179,7 @@ export default function AdminReport() {
         }}>← Dashboard</button>
         <span style={{ fontWeight: 700, fontSize: 15 }}>Assessment Report</span>
         <div style={{ display: 'flex', gap: 10 }}>
-          {!hasPendingAI && (
+          {scores && (
             <button onClick={handleRegenerate} style={{
               background: 'rgba(255,255,255,0.12)', color: WHITE,
               border: '1px solid rgba(255,255,255,0.25)', borderRadius: 6,

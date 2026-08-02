@@ -1,0 +1,6 @@
+# Developed on Windows, built and run on Linux. CRLF breaks the entrypoint
+# script ("bad interpreter: /usr/bin/env sh^M"), so normalise to LF.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.xlsx binary

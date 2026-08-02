@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+node_modules
+client/node_modules
+client/dist
+# A separate project that happens to live in this working tree — never part of
+# this image.
+ksb-personality-analyser
+.claude
+*.log
+.DS_Store
+Thumbs.db

@@ -6,6 +6,7 @@ import AdminReport     from './pages/AdminReport.jsx';
 import CandidateAssess from './pages/CandidateAssess.jsx';
 import CandidateDone   from './pages/CandidateDone.jsx';
 import NotFound        from './pages/NotFound.jsx';
+import { BASE }        from './basePath.js';
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -44,7 +45,7 @@ function RequireAdmin({ children }) {
 export default function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={BASE}>
         <Suspense fallback={<Loader />}>
           <Routes>
             {/* Public */}

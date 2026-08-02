@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+import { withBase } from '../basePath';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: withBase('/api'),
 });
 
 // Attach JWT to every request if present
@@ -19,7 +21,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('rdc_admin_token');
-      window.location.href = '/admin/login';
+      window.location.href = withBase('/admin/login');
     }
     return Promise.reject(err);
   }

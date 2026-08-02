@@ -2,8 +2,11 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-COPY client/package.json client/package-lock.json ./client/
+# The trailing * makes each lockfile optional — the root package-lock.json has
+# never been committed, and COPY fails hard on a missing literal path. npm
+# install below resolves fine either way.
+COPY package.json package-lock.json* ./
+COPY client/package.json client/package-lock.json* ./client/
 # The root postinstall installs the client too, with --include=dev so the
 # build toolchain is present regardless of NODE_ENV.
 RUN npm install --no-audit --no-fund
@@ -25,7 +28,7 @@ ENV NODE_ENV=production
 ARG BASE_PATH=""
 ENV BASE_PATH=$BASE_PATH
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json* ./
 # --ignore-scripts skips the postinstall that would pull in the client's
 # toolchain; the built assets are copied from the builder instead.
 RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund

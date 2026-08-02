@@ -3,12 +3,20 @@ const crypto   = require('crypto');
 const path     = require('path');
 const XLSX     = require('xlsx');
 const pool     = require('../db');
-const { requireAdmin } = require('../auth');
+const { requireAdmin, REQUIRE_SSO } = require('../auth');
 const { generateAndStoreReport } = require('../aiReport');
 
 const router = express.Router();
 
-// All admin routes require a valid JWT
+// GET /api/admin/me — deliberately BEFORE requireAdmin, since its whole job is
+// to tell a not-yet-authenticated client whether the HR platform already knows
+// who they are. Returns null on Railway and locally, where the login form is
+// still the way in.
+router.get('/me', (req, res) => {
+  res.json({ email: req.headers['x-auth-email'] || null, sso: REQUIRE_SSO });
+});
+
+// All other admin routes require a valid JWT, or the platform-verified identity
 router.use(requireAdmin);
 
 // ── GET /api/admin/assessments ─────────────────────────────────────────────

@@ -98,7 +98,14 @@ export default function AdminDashboard() {
   }
 
   function handleLogout() {
+    const wasSso = localStorage.getItem('rdc_admin_token') === 'hr-sso';
     localStorage.removeItem('rdc_admin_token');
+    if (wasSso) {
+      // Signed in through the HR portal — end the shared session there, or the
+      // login page would simply recognise us again and bounce straight back.
+      window.location.href = '/api/auth/logout';
+      return;
+    }
     navigate('/admin/login');
   }
 

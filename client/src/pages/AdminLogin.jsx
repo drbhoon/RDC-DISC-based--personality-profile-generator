@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client.js';
 
@@ -20,7 +20,27 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  const [checkingSso, setCheckingSso] = useState(true);
   const navigate = useNavigate();
+
+  // On the HR platform nginx has already verified this person against the HR
+  // allowlist, so a second login would be pointless friction. The marker token
+  // simply satisfies the client-side route guard — the server ignores it and
+  // trusts the X-Auth-Email header it receives from nginx instead.
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/admin/me')
+      .then(({ data }) => {
+        if (data?.email && !cancelled) {
+          localStorage.setItem('rdc_admin_token', 'hr-sso');
+          navigate('/admin', { replace: true });
+          return;
+        }
+        if (!cancelled) setCheckingSso(false);
+      })
+      .catch(() => { if (!cancelled) setCheckingSso(false); });
+    return () => { cancelled = true; };
+  }, [navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -35,6 +55,10 @@ export default function AdminLogin() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checkingSso) {
+    return <div style={S.page}><p style={S.sub}>Checking sign-in…</p></div>;
   }
 
   return (

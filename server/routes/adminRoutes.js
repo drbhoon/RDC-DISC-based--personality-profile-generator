@@ -13,7 +13,11 @@ const router = express.Router();
 // who they are. Returns null on Railway and locally, where the login form is
 // still the way in.
 router.get('/me', (req, res) => {
-  res.json({ email: req.headers['x-auth-email'] || null, sso: REQUIRE_SSO });
+  // Only claim an identity when SSO is actually switched on. Reporting the
+  // header while REQUIRE_SSO is off would send the client past the login form
+  // to a dashboard whose requests then 401, bouncing it straight back.
+  const email = REQUIRE_SSO ? (req.headers['x-auth-email'] || null) : null;
+  res.json({ email, sso: REQUIRE_SSO });
 });
 
 // All other admin routes require a valid JWT, or the platform-verified identity

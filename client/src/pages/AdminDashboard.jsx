@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client.js';
+import { BASE, withBase } from '../basePath.js';
 import { ROLE_OPTIONS } from '../constants/questions.js';
 
 const S = {
@@ -94,7 +95,9 @@ export default function AdminDashboard() {
 
   async function handleExport() {
     const token = localStorage.getItem('rdc_admin_token');
-    window.open(`/api/admin/export/excel?token=${token}`, '_blank');
+    // window.open takes a raw URL — nothing prefixes it for us, unlike the
+    // axios client, which is built on withBase('/api').
+    window.open(withBase(`/api/admin/export/excel?token=${token}`), '_blank');
   }
 
   function handleLogout() {
@@ -103,13 +106,24 @@ export default function AdminDashboard() {
     if (wasSso) {
       // Signed in through the HR portal — end the shared session there, or the
       // login page would simply recognise us again and bounce straight back.
+      //
+      // DELIBERATELY UNPREFIXED: this is the PORTAL's endpoint at the site
+      // root, not ours. withBase() here would point at /disc/api/auth/logout,
+      // which does not exist.
       window.location.href = '/api/auth/logout';
       return;
     }
     navigate('/admin/login');
   }
 
-  const appUrl = window.location.origin;
+  // Includes the mount prefix. On the HR platform the app lives at
+  // hr.rdcc.ai/disc, so origin alone builds hr.rdcc.ai/assess/<token> — which
+  // hits the portal and 404s. This link is copied out to candidates, so it
+  // fails in someone else's browser, not in the console that produced it.
+  // The link shown in the "assessment created" modal is built server-side from
+  // APP_URL (already .../disc) and was never affected — so the created-link
+  // working while the copied one 404s is the signature of exactly this bug.
+  const appUrl = window.location.origin + BASE;
 
   return (
     <div style={S.page}>

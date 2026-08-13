@@ -27,6 +27,7 @@ const S = {
   mBox:    { background: '#fff', borderRadius: 12, padding: 32, width: '100%', maxWidth: 480, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' },
   mTitle:  { margin: '0 0 20px', fontSize: 18, fontWeight: 700, color: '#1F3864' },
   label:   { display: 'block', fontSize: 13, fontWeight: 600, color: '#444', marginBottom: 6 },
+  hint:    { margin: '6px 0 0', fontSize: 12, lineHeight: 1.45, color: '#777' },
   input:   { width: '100%', padding: '10px 14px', border: '1.5px solid #ddd', borderRadius: 8, fontSize: 14 },
   select:  { width: '100%', padding: '10px 14px', border: '1.5px solid #ddd', borderRadius: 8, fontSize: 14 },
   field:   { marginBottom: 16 },
@@ -217,9 +218,18 @@ export default function AdminDashboard() {
                     onChange={(e) => setForm({ ...form, candidate_name: e.target.value })} />
                 </div>
                 <div style={S.field}>
-                  <label style={S.label}>Email (optional)</label>
-                  <input style={S.input} type="email" value={form.candidate_email}
+                  <label style={S.label}>Email *</label>
+                  <input style={S.input} type="email" required value={form.candidate_email}
                     onChange={(e) => setForm({ ...form, candidate_email: e.target.value })} />
+                  {/* Says WHY it is required. Without a reason on screen this
+                      reads as a form that got stricter for no reason, and the
+                      first instinct is to type anything to get past it — which
+                      is precisely what breaks the link to the person. */}
+                  <p style={S.hint}>
+                    Used to link this profile to the person, so their DISC result
+                    can be seen alongside their other assessments. Use the
+                    company address for employees.
+                  </p>
                 </div>
                 <div style={S.field}>
                   <label style={S.label}>Role Being Assessed *</label>

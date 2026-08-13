@@ -5,6 +5,7 @@ const XLSX     = require('xlsx');
 const pool     = require('../db');
 const { requireAdmin, REQUIRE_SSO } = require('../auth');
 const { generateAndStoreReport } = require('../aiReport');
+const { resolvePerson } = require('../lib/identity');
 
 const router = express.Router();
 
@@ -49,16 +50,38 @@ router.post('/assessments', async (req, res) => {
   if (!candidate_name || !role_assessed) {
     return res.status(400).json({ error: 'candidate_name and role_assessed are required' });
   }
+  // E-mail is now REQUIRED. It used to be "optional, for records only", which
+  // is exactly why a DISC profile could never be tied to the person it
+  // described. It is the key the whole platform resolves people by.
+  const email = String(candidate_email || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({
+      error: 'A candidate e-mail address is required — it is how this profile is linked to the person.',
+    });
+  }
 
   const token = crypto.randomBytes(32).toString('hex');
   const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3001}`;
 
+  // DISC is open to non-employees, so an unknown address is not an error — it
+  // becomes an external person. A portal that cannot be REACHED is different:
+  // the assessment is still created with person_id null and picked up by the
+  // backfill, because a portal hiccup must not stop HR issuing a link.
+  let personId = null;
+  const resolved = await resolvePerson({ email, name: candidate_name });
+  if (resolved.ok) {
+    personId = resolved.person.person_id;
+  } else if (resolved.reason !== 'unconfigured') {
+    console.warn(`[admin/assessments POST] identity unresolved (${resolved.reason}) for ${email}`);
+  }
+
   try {
     const { rows } = await pool.query(
-      `INSERT INTO assessments (candidate_name, candidate_email, role_assessed, token, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, candidate_name, role_assessed, token, status, created_at`,
-      [candidate_name, candidate_email || null, role_assessed, token, req.admin.sub]
+      `INSERT INTO assessments
+         (candidate_name, candidate_email, role_assessed, token, created_by, person_id, captured_email)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, candidate_name, role_assessed, token, status, created_at, person_id`,
+      [candidate_name, email, role_assessed, token, req.admin.sub, personId, email]
     );
     const assessment = rows[0];
     const assessmentUrl = `${appUrl}/assess/${token}`;

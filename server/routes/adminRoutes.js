@@ -204,6 +204,14 @@ router.get('/export/excel', async (req, res) => {
       ORDER BY a.completed_at DESC
     `);
 
+    // v2.1 balanced instrument went live 2026-06-20. Assessments completed before
+    // then used the v2.0 set (biased I/S) — label each row so analysis doesn't mix them.
+    const V21_CUTOVER = new Date('2026-06-20T00:00:00Z');
+    const instrumentOf = (completedAt) => {
+      if (!completedAt) return '';
+      return new Date(completedAt) >= V21_CUTOVER ? 'v2.1' : 'v2.0 (pre-fix)';
+    };
+
     const ws = XLSX.utils.json_to_sheet(rows.map((r) => ({
       'Candidate Name':    r.candidate_name,
       'Email':             r.candidate_email || '',
@@ -211,9 +219,10 @@ router.get('/export/excel', async (req, res) => {
       'Status':            r.status,
       'Created At':        r.created_at ? new Date(r.created_at).toISOString() : '',
       'Completed At':      r.completed_at ? new Date(r.completed_at).toISOString() : '',
-      'G1 D': r.g1_d, 'G1 I': r.g1_i, 'G1 S': r.g1_s, 'G1 C': r.g1_c,
-      'G2 D': r.g2_d, 'G2 I': r.g2_i, 'G2 S': r.g2_s, 'G2 C': r.g2_c,
-      'G3 D': r.g3_d, 'G3 I': r.g3_i, 'G3 S': r.g3_s, 'G3 C': r.g3_c,
+      'Instrument':        instrumentOf(r.completed_at),
+      'Work Mask D':       r.g1_d, 'Work Mask I':      r.g1_i, 'Work Mask S':      r.g1_s, 'Work Mask C':      r.g1_c,
+      'Under Pressure D':  r.g2_d, 'Under Pressure I': r.g2_i, 'Under Pressure S': r.g2_s, 'Under Pressure C': r.g2_c,
+      'Self Image D':      r.g3_d, 'Self Image I':     r.g3_i, 'Self Image S':     r.g3_s, 'Self Image C':     r.g3_c,
       'Primary Style':     r.primary_style,
       'Secondary Style':   r.secondary_style,
       'Verdict':           r.verdict_assessed_role,

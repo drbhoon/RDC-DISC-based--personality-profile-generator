@@ -6,6 +6,7 @@ const pool     = require('../db');
 const { requireAdmin, REQUIRE_SSO } = require('../auth');
 const { generateAndStoreReport } = require('../aiReport');
 const { resolvePerson } = require('../lib/identity');
+const { isSmtpConfigured, sendInvite } = require('../lib/mailer');
 
 const router = express.Router();
 
@@ -31,7 +32,8 @@ router.get('/assessments', async (req, res) => {
     const { rows } = await pool.query(`
       SELECT
         a.id, a.candidate_name, a.candidate_email, a.role_assessed,
-        a.token, a.status, a.created_at, a.completed_at
+        a.token, a.status, a.created_at, a.completed_at,
+        a.invited_at, a.deadline_at
       FROM assessments a
       WHERE a.status != 'deleted'
       ORDER BY a.created_at DESC
@@ -106,6 +108,82 @@ router.delete('/assessments/:id', async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('[admin/assessments DELETE]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/admin/assessments/send-invites ─────────────────────────────
+// Bulk-send the invitation e-mail to a set of PENDING assessments and stamp
+// each with the chosen deadline. Candidates complete the test themselves — the
+// "schedule" here is the deadline shown in the e-mail, not a deferred send.
+//
+// Body: { ids: [uuid, ...], deadline: 'YYYY-MM-DD' | '' }
+// Returns a per-candidate outcome so HR can see exactly who was reached.
+router.post('/assessments/send-invites', async (req, res) => {
+  const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
+  const deadline = String(req.body.deadline || '').trim(); // '' = no deadline
+  if (ids.length === 0) {
+    return res.status(400).json({ error: 'Select at least one candidate to invite.' });
+  }
+  // Fail loudly BEFORE touching anyone, rather than marking half the batch
+  // "invited" and then discovering the mail server was never set up.
+  if (!isSmtpConfigured()) {
+    return res.status(503).json({
+      error: 'E-mail is not configured on this server. Set SMTP_HOST, SMTP_USER and SMTP_PASS for the disc service, then try again.',
+    });
+  }
+
+  const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3001}`;
+
+  try {
+    // Only pending, non-deleted rows that are actually in this request.
+    const { rows } = await pool.query(
+      `SELECT id, candidate_name, candidate_email, role_assessed, token
+         FROM assessments
+        WHERE id = ANY($1::uuid[]) AND status = 'pending'`,
+      [ids]
+    );
+    const byId = new Map(rows.map((r) => [r.id, r]));
+
+    const results = [];
+    for (const id of ids) {
+      const a = byId.get(id);
+      if (!a) {
+        results.push({ id, ok: false, error: 'Not found or already completed' });
+        continue;
+      }
+      const email = String(a.candidate_email || '').trim();
+      if (!email || !email.includes('@')) {
+        results.push({ id, name: a.candidate_name, ok: false, error: 'No valid e-mail on file' });
+        continue;
+      }
+      const link = `${appUrl}/assess/${a.token}`;
+      try {
+        await sendInvite({
+          to: email,
+          name: a.candidate_name,
+          role: a.role_assessed,
+          link,
+          deadline,
+        });
+        await pool.query(
+          `UPDATE assessments
+              SET invited_at = NOW(),
+                  deadline_at = $2
+            WHERE id = $1`,
+          [id, deadline || null]
+        );
+        results.push({ id, name: a.candidate_name, email, ok: true });
+      } catch (err) {
+        console.error(`[send-invites] ${email}:`, err.message);
+        results.push({ id, name: a.candidate_name, email, ok: false, error: 'Send failed' });
+      }
+    }
+
+    const sent = results.filter((r) => r.ok).length;
+    return res.json({ sent, total: results.length, results });
+  } catch (err) {
+    console.error('[admin/send-invites POST]', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

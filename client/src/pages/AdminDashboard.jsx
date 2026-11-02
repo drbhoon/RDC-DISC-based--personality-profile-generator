@@ -42,6 +42,13 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// Default "complete by" = one week out, as a YYYY-MM-DD value for <input type=date>.
+function defaultDeadline() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function AdminDashboard() {
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -51,6 +58,11 @@ export default function AdminDashboard() {
   const [form, setForm]               = useState({ candidate_name: '', candidate_email: '', role_assessed: '' });
   const [creating, setCreating]       = useState(false);
   const [copied, setCopied]           = useState('');
+  const [showInvite, setShowInvite]   = useState(false);
+  const [inviteDeadline, setInviteDeadline] = useState(defaultDeadline());
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [sending, setSending]         = useState(false);
+  const [inviteResult, setInviteResult] = useState(null);
   const navigate = useNavigate();
 
   async function load() {
@@ -92,6 +104,46 @@ export default function AdminDashboard() {
     navigator.clipboard.writeText(url);
     setCopied(id);
     setTimeout(() => setCopied(''), 2000);
+  }
+
+  // Candidates who can be invited: still pending and with a usable e-mail.
+  const pending   = assessments.filter((a) => a.status === 'pending');
+  const invitable = pending.filter((a) => a.candidate_email && a.candidate_email.includes('@'));
+
+  function openInvite() {
+    // Pre-select everyone pending who has not been invited yet; if all have
+    // already been invited, pre-select all so a reminder resend is one click.
+    const notYet = invitable.filter((a) => !a.invited_at).map((a) => a.id);
+    const preset = notYet.length ? notYet : invitable.map((a) => a.id);
+    setSelectedIds(new Set(preset));
+    setInviteDeadline(defaultDeadline());
+    setInviteResult(null);
+    setShowInvite(true);
+  }
+
+  function toggleId(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSendInvites() {
+    setSending(true);
+    setInviteResult(null);
+    try {
+      const { data } = await api.post('/admin/assessments/send-invites', {
+        ids: [...selectedIds],
+        deadline: inviteDeadline,
+      });
+      setInviteResult(data);
+      load();
+    } catch (err) {
+      setInviteResult({ error: err.response?.data?.error || 'Send failed' });
+    } finally {
+      setSending(false);
+    }
   }
 
   async function handleExport() {
@@ -143,6 +195,9 @@ export default function AdminDashboard() {
         <div style={S.topBar}>
           <h1 style={S.pageH}>Assessments</h1>
           <div style={S.actions}>
+            <button style={S.btnSecondary} onClick={openInvite}>
+              ✉ Schedule &amp; Invite
+            </button>
             <button style={S.btnPrimary} onClick={() => { setShowCreate(true); setNewLink(''); }}>
               + New Assessment
             </button>
@@ -171,6 +226,16 @@ export default function AdminDashboard() {
                     <span style={S.badge[a.status] || S.badge.pending}>
                       {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
                     </span>
+                    {a.invited_at && (
+                      <div style={{ fontSize: 11, color: '#2E5496', marginTop: 4 }}>
+                        ✉ Invited {formatDate(a.invited_at)}
+                      </div>
+                    )}
+                    {a.deadline_at && a.status === 'pending' && (
+                      <div style={{ fontSize: 11, color: '#a06000', marginTop: 2 }}>
+                        Due {formatDate(a.deadline_at)}
+                      </div>
+                    )}
                   </td>
                   <td style={S.td}>{formatDate(a.created_at)}</td>
                   <td style={S.td}>{formatDate(a.completed_at)}</td>
@@ -257,6 +322,97 @@ export default function AdminDashboard() {
                 </div>
                 <div style={S.mActions}>
                   <button style={S.btnPrimary} onClick={() => setShowCreate(false)}>Done</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Schedule & Invite Modal */}
+      {showInvite && (
+        <div style={S.modal} onClick={(e) => e.target === e.currentTarget && setShowInvite(false)}>
+          <div style={{ ...S.mBox, maxWidth: 560 }}>
+            <h2 style={S.mTitle}>Schedule &amp; Invite Candidates</h2>
+
+            {!inviteResult ? (
+              <>
+                <div style={S.field}>
+                  <label style={S.label}>Complete by (deadline)</label>
+                  <input type="date" style={S.input} value={inviteDeadline}
+                    onChange={(e) => setInviteDeadline(e.target.value)} />
+                  <p style={S.hint}>
+                    Shown in the e-mail as “please complete it by this date”. Leave blank for no fixed deadline.
+                  </p>
+                </div>
+
+                <div style={S.field}>
+                  <label style={S.label}>
+                    Pending candidates ({selectedIds.size} of {invitable.length} selected)
+                  </label>
+                  {invitable.length === 0 ? (
+                    <p style={S.hint}>No pending candidates with an e-mail address on file.</p>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 8 }}>
+                        <button type="button" style={{ ...S.iconBtn, color: '#2E5496' }}
+                          onClick={() => setSelectedIds(new Set(invitable.map((a) => a.id)))}>Select all</button>
+                        <button type="button" style={{ ...S.iconBtn, color: '#888' }}
+                          onClick={() => setSelectedIds(new Set())}>Clear</button>
+                      </div>
+                      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                        {invitable.map((a) => (
+                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', fontSize: 13 }}>
+                            <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleId(a.id)} />
+                            <span style={{ flex: 1 }}>
+                              <strong>{a.candidate_name}</strong>
+                              <span style={{ color: '#888' }}> — {a.candidate_email}</span>
+                            </span>
+                            {a.invited_at && <span style={{ fontSize: 11, color: '#2E5496' }}>✉ invited</span>}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {pending.length > invitable.length && (
+                  <p style={{ ...S.hint, color: '#a06000' }}>
+                    {pending.length - invitable.length} pending candidate(s) have no valid e-mail and are not shown.
+                  </p>
+                )}
+
+                <div style={S.mActions}>
+                  <button type="button" style={S.btnSecondary} onClick={() => setShowInvite(false)}>Cancel</button>
+                  <button type="button" style={S.btnPrimary} disabled={sending || selectedIds.size === 0}
+                    onClick={handleSendInvites}>
+                    {sending ? 'Sending…' : `Send ${selectedIds.size} Invitation${selectedIds.size === 1 ? '' : 's'}`}
+                  </button>
+                </div>
+              </>
+            ) : inviteResult.error ? (
+              <>
+                <p style={{ color: '#c0392b', fontWeight: 600 }}>{inviteResult.error}</p>
+                <div style={S.mActions}>
+                  <button style={S.btnPrimary} onClick={() => setInviteResult(null)}>Back</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#155724', fontWeight: 600 }}>
+                  Sent {inviteResult.sent} of {inviteResult.total} invitation{inviteResult.total === 1 ? '' : 's'}.
+                </p>
+                {inviteResult.results.some((r) => !r.ok) && (
+                  <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
+                    {inviteResult.results.filter((r) => !r.ok).map((r) => (
+                      <div key={r.id} style={{ fontSize: 13, color: '#c0392b', padding: '2px 0' }}>
+                        ✗ {r.name || r.id}: {r.error}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={S.mActions}>
+                  <button style={S.btnPrimary} onClick={() => setShowInvite(false)}>Done</button>
                 </div>
               </>
             )}

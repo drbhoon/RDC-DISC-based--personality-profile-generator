@@ -50,12 +50,24 @@ function formatDeadline(deadline) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// Date + time in IST, e.g. "5 Nov 2026, 9:00 am". start is an ISO instant.
+function formatStart(start) {
+  if (!start) return '';
+  const d = new Date(start);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata',
+  });
+}
+
 /**
  * Pure builder: given the candidate details and link, return the e-mail's
  * subject, text and html. No I/O — this is what the tests cover.
  */
-function buildInvite({ name, role, link, deadline }) {
+function buildInvite({ name, role, link, deadline, start }) {
   const by = formatDeadline(deadline);
+  const from = formatStart(start);
   const subject = 'RDC Behavioural Assessment — your personal link';
 
   const lines = [
@@ -63,6 +75,7 @@ function buildInvite({ name, role, link, deadline }) {
     '',
     `You have been invited to complete the RDC behavioural assessment (DISC)${role ? ` for the role of ${role}` : ''}.`,
     'It takes about 10–15 minutes and should be done in one sitting.',
+    from ? `The assessment opens on ${from} — the link will not accept answers before then.` : '',
     by ? `Please complete it by ${by}.` : '',
     '',
     `Open your assessment: ${link}`,
@@ -97,9 +110,9 @@ function buildInvite({ name, role, link, deadline }) {
  * Send one invitation. Throws if SMTP is not configured or the send fails, so
  * the route can report a per-candidate outcome.
  */
-async function sendInvite({ to, name, role, link, deadline }) {
+async function sendInvite({ to, name, role, link, deadline, start }) {
   if (!isSmtpConfigured()) throw new Error('SMTP is not configured on this server');
-  const { subject, text, html } = buildInvite({ name, role, link, deadline });
+  const { subject, text, html } = buildInvite({ name, role, link, deadline, start });
   await transport().sendMail({ from: FROM(), to, subject, text, html });
 }
 

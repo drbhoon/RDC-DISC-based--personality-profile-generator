@@ -33,7 +33,7 @@ router.get('/assessments', async (req, res) => {
       SELECT
         a.id, a.candidate_name, a.candidate_email, a.role_assessed,
         a.token, a.status, a.created_at, a.completed_at,
-        a.invited_at, a.deadline_at
+        a.invited_at, a.deadline_at, a.start_at
       FROM assessments a
       WHERE a.status != 'deleted'
       ORDER BY a.created_at DESC
@@ -122,6 +122,7 @@ router.delete('/assessments/:id', async (req, res) => {
 router.post('/assessments/send-invites', async (req, res) => {
   const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
   const deadline = String(req.body.deadline || '').trim(); // '' = no deadline
+  const start = String(req.body.start || '').trim();       // ISO instant, '' = opens now
   if (ids.length === 0) {
     return res.status(400).json({ error: 'Select at least one candidate to invite.' });
   }
@@ -165,13 +166,15 @@ router.post('/assessments/send-invites', async (req, res) => {
           role: a.role_assessed,
           link,
           deadline,
+          start,
         });
         await pool.query(
           `UPDATE assessments
               SET invited_at = NOW(),
-                  deadline_at = $2
+                  deadline_at = $2,
+                  start_at = $3
             WHERE id = $1`,
-          [id, deadline || null]
+          [id, deadline || null, start || null]
         );
         results.push({ id, name: a.candidate_name, email, ok: true });
       } catch (err) {
@@ -184,6 +187,32 @@ router.post('/assessments/send-invites', async (req, res) => {
     return res.json({ sent, total: results.length, results });
   } catch (err) {
     console.error('[admin/send-invites POST]', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/admin/assessments/:id/schedule ────────────────────────────
+// Edit the window of an existing assessment — used when a drive slips and the
+// start time (or deadline) has to move AFTER invites already went out. Does
+// not re-send any e-mail; just updates the stored schedule the candidate gate
+// reads. Body: { start: ISO|'' , deadline: 'YYYY-MM-DD'|'' } ('' clears).
+router.patch('/assessments/:id/schedule', async (req, res) => {
+  const start = String(req.body.start || '').trim();
+  const deadline = String(req.body.deadline || '').trim();
+  try {
+    const { rows } = await pool.query(
+      `UPDATE assessments
+          SET start_at = $2, deadline_at = $3
+        WHERE id = $1 AND status != 'deleted'
+      RETURNING id, start_at, deadline_at, status`,
+      [req.params.id, start || null, deadline || null]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Assessment not found' });
+    }
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('[admin/schedule PATCH]', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

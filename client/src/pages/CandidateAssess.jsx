@@ -89,6 +89,26 @@ export default function CandidateAssess() {
     );
   }
 
+  // Start-time gate: before the assessment opens, show a waiting screen instead
+  // of the questions. The server also refuses an early submit, so this is only
+  // for a graceful wait, not the actual lock.
+  if (meta.opens_at && Date.now() < new Date(meta.opens_at).getTime()) {
+    const opensStr = new Date(meta.opens_at).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' });
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f3f8', fontFamily: "'Segoe UI', Arial, sans-serif", padding: 24 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: '36px 40px', maxWidth: 460, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🕑</div>
+          <h1 style={{ margin: '0 0 10px', fontSize: 20, color: '#1a2e4a', fontWeight: 800 }}>Hello {meta.candidate_name},</h1>
+          <p style={{ margin: '0 0 8px', fontSize: 15, color: '#444', lineHeight: 1.5 }}>Your assessment has not opened yet. It opens on:</p>
+          <p style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: '#2563a8' }}>{opensStr}</p>
+          <p style={{ margin: 0, fontSize: 13, color: '#888', lineHeight: 1.5 }}>
+            Please return to this same link at that time. You can close this page until then.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const progressPct = Math.round((answeredCount / 24) * 100);
 
   return (

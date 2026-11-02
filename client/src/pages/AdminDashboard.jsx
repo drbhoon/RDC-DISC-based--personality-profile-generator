@@ -49,6 +49,33 @@ function defaultDeadline() {
   return d.toISOString().slice(0, 10);
 }
 
+function formatDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// Stored ISO instant → value for <input type="datetime-local"> in the admin's
+// local time (what they picked is what they see).
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+// datetime-local value (local) → ISO instant, or '' when empty.
+function localInputToIso(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
+// Stored date/ISO → 'YYYY-MM-DD' for <input type="date"> in local time.
+function toDateInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 export default function AdminDashboard() {
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -60,9 +87,14 @@ export default function AdminDashboard() {
   const [copied, setCopied]           = useState('');
   const [showInvite, setShowInvite]   = useState(false);
   const [inviteDeadline, setInviteDeadline] = useState(defaultDeadline());
+  const [inviteStart, setInviteStart] = useState(''); // '' = opens immediately
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [sending, setSending]         = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
+  const [showSchedule, setShowSchedule] = useState(null); // assessment being re-scheduled
+  const [schedStart, setSchedStart]   = useState('');
+  const [schedDeadline, setSchedDeadline] = useState('');
+  const [savingSched, setSavingSched] = useState(false);
   const navigate = useNavigate();
 
   async function load() {
@@ -117,6 +149,7 @@ export default function AdminDashboard() {
     const preset = notYet.length ? notYet : invitable.map((a) => a.id);
     setSelectedIds(new Set(preset));
     setInviteDeadline(defaultDeadline());
+    setInviteStart('');
     setInviteResult(null);
     setShowInvite(true);
   }
@@ -136,6 +169,7 @@ export default function AdminDashboard() {
       const { data } = await api.post('/admin/assessments/send-invites', {
         ids: [...selectedIds],
         deadline: inviteDeadline,
+        start: localInputToIso(inviteStart),
       });
       setInviteResult(data);
       load();
@@ -143,6 +177,28 @@ export default function AdminDashboard() {
       setInviteResult({ error: err.response?.data?.error || 'Send failed' });
     } finally {
       setSending(false);
+    }
+  }
+
+  function openSchedule(a) {
+    setSchedStart(toLocalInput(a.start_at));
+    setSchedDeadline(toDateInput(a.deadline_at));
+    setShowSchedule(a);
+  }
+
+  async function handleSaveSchedule() {
+    setSavingSched(true);
+    try {
+      await api.patch(`/admin/assessments/${showSchedule.id}/schedule`, {
+        start: localInputToIso(schedStart),
+        deadline: schedDeadline,
+      });
+      setShowSchedule(null);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Update failed');
+    } finally {
+      setSavingSched(false);
     }
   }
 
@@ -231,6 +287,11 @@ export default function AdminDashboard() {
                         ✉ Invited {formatDate(a.invited_at)}
                       </div>
                     )}
+                    {a.start_at && a.status === 'pending' && (
+                      <div style={{ fontSize: 11, color: '#1a7a42', marginTop: 2 }}>
+                        Opens {formatDateTime(a.start_at)}
+                      </div>
+                    )}
                     {a.deadline_at && a.status === 'pending' && (
                       <div style={{ fontSize: 11, color: '#a06000', marginTop: 2 }}>
                         Due {formatDate(a.deadline_at)}
@@ -254,6 +315,14 @@ export default function AdminDashboard() {
                         onClick={() => navigate(`/admin/report/${a.id}`)}
                       >
                         View Report
+                      </button>
+                    )}
+                    {a.status === 'pending' && (
+                      <button
+                        style={{ ...S.iconBtn, color: '#1a7a42', marginRight: 8 }}
+                        onClick={() => openSchedule(a)}
+                      >
+                        🕑 Schedule
                       </button>
                     )}
                     <button
@@ -338,6 +407,14 @@ export default function AdminDashboard() {
             {!inviteResult ? (
               <>
                 <div style={S.field}>
+                  <label style={S.label}>Starts — not before (optional)</label>
+                  <input type="datetime-local" style={S.input} value={inviteStart}
+                    onChange={(e) => setInviteStart(e.target.value)} />
+                  <p style={S.hint}>
+                    Candidates cannot begin before this date &amp; time. Leave blank to let them start as soon as they get the link.
+                  </p>
+                </div>
+                <div style={S.field}>
                   <label style={S.label}>Complete by (deadline)</label>
                   <input type="date" style={S.input} value={inviteDeadline}
                     onChange={(e) => setInviteDeadline(e.target.value)} />
@@ -416,6 +493,36 @@ export default function AdminDashboard() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Schedule Modal — change start/deadline after invites went out */}
+      {showSchedule && (
+        <div style={S.modal} onClick={(e) => e.target === e.currentTarget && setShowSchedule(null)}>
+          <div style={S.mBox}>
+            <h2 style={S.mTitle}>Edit Schedule</h2>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#555' }}>
+              <strong>{showSchedule.candidate_name}</strong>
+            </p>
+            <div style={S.field}>
+              <label style={S.label}>Starts — not before</label>
+              <input type="datetime-local" style={S.input} value={schedStart}
+                onChange={(e) => setSchedStart(e.target.value)} />
+              <p style={S.hint}>Candidates cannot begin before this. Clear it to let them start immediately.</p>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Complete by (deadline)</label>
+              <input type="date" style={S.input} value={schedDeadline}
+                onChange={(e) => setSchedDeadline(e.target.value)} />
+            </div>
+            <p style={S.hint}>This updates the assessment window. It does not re-send any e-mail.</p>
+            <div style={S.mActions}>
+              <button type="button" style={S.btnSecondary} onClick={() => setShowSchedule(null)}>Cancel</button>
+              <button type="button" style={S.btnPrimary} disabled={savingSched} onClick={handleSaveSchedule}>
+                {savingSched ? 'Saving…' : 'Save Schedule'}
+              </button>
+            </div>
           </div>
         </div>
       )}

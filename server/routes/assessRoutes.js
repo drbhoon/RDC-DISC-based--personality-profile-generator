@@ -11,7 +11,7 @@ const router = express.Router();
 router.get('/:token', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, candidate_name, role_assessed, status
+      `SELECT id, candidate_name, role_assessed, status, start_at
        FROM assessments WHERE token = $1`,
       [req.params.token]
     );
@@ -25,10 +25,13 @@ router.get('/:token', async (req, res) => {
     if (a.status === 'deleted') {
       return res.status(404).json({ error: 'Assessment not found' });
     }
+    // opens_at drives the candidate's "not open yet" screen. The actual lock is
+    // enforced on submit below — this is only so the page can wait gracefully.
     return res.json({
       candidate_name: a.candidate_name,
       role_assessed:  a.role_assessed,
       status:         a.status,
+      opens_at:       a.start_at,
     });
   } catch (err) {
     console.error('[assess/:token GET]', err);
@@ -62,7 +65,7 @@ router.post('/:token/submit', async (req, res) => {
   let assessment;
   try {
     const { rows } = await pool.query(
-      `SELECT id, candidate_name, role_assessed, status FROM assessments WHERE token = $1`,
+      `SELECT id, candidate_name, role_assessed, status, start_at FROM assessments WHERE token = $1`,
       [req.params.token]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Assessment not found' });
@@ -72,6 +75,14 @@ router.post('/:token/submit', async (req, res) => {
     }
     if (assessment.status === 'deleted') {
       return res.status(404).json({ error: 'Assessment not found' });
+    }
+    // The real start-time lock: refuse a submission before the assessment opens,
+    // so the window cannot be bypassed by a client with a wrong clock.
+    if (assessment.start_at && Date.now() < new Date(assessment.start_at).getTime()) {
+      const opensIst = new Date(assessment.start_at).toLocaleString('en-IN', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata',
+      });
+      return res.status(403).json({ error: `This assessment opens on ${opensIst}. Please try again then.` });
     }
   } catch (err) {
     console.error('[assess/submit] fetch:', err);
